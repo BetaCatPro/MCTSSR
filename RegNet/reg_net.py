@@ -28,10 +28,9 @@ def train_net(file_name, scale, run_iter, training_view, unlabeled_view, validat
     np.random.seed(config['logging_params']['manual_seed'])
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    validation = transform(file_name, validation_view)
-
-    # 非度量策略
-    if config['regression_exp_params']['category'] != 'metric':
+    if config['regression_exp_params']['category'] == 'metric':
+        validation = transform(file_name, validation_view)
+    else:
         config['regression_model_params']['in_channels'] = training_view.shape[1]-1
         validation = validation_view
         
@@ -75,7 +74,7 @@ def train_net(file_name, scale, run_iter, training_view, unlabeled_view, validat
     pd.DataFrame(pd_dict).to_csv('{}/{}-{}.csv'.format(save_dir, run_iter,
                                                        datetime.datetime.now().strftime(
                                                            "%Y-%m-%d-%H-%M-%S")))
-    plot_res(config['regression_exp_params']['epochs'], pd_dict)
+    # plot_res(config['regression_exp_params']['epochs'], pd_dict)
 
 
 def plot_res(epochs, data):

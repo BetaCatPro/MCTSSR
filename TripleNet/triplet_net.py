@@ -129,6 +129,9 @@ def train_triple_net(data_name, in_channels, scale):
     optimizer = torch.optim.Adam(model.parameters(), lr=config['metric_exp_params']['LR'])
 
     pre_triplet_loader = get_pre_data_loaders(**config)
+    # train(config['metric_exp_params']['epochs'], pre_triplet_loader, model, optimizer, device,
+    #       config['metric_model_params']['in_channels'], 'view_{}'.format(data_name), save_path)
+    
     train(config['metric_exp_params']['epochs'], pre_triplet_loader, model, optimizer, device,
           config['metric_model_params']['in_channels'])
 

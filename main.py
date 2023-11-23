@@ -53,7 +53,7 @@ if __name__ == '__main__':
                 save_dir = './experiment/metric_ablation/{}/{}'.format(file, scale)
                 if config['regression_exp_params']['category'] == 'metric':
                     generate_file(file, labeled_data, unlabeled_data, test_data, scale)
-                    # train_triple_net(file, in_channels, scale)
+                    train_triple_net(file, in_channels, scale)
                     
                     save_dir = './experiment/test/{}/{}'.format(file, scale)
                 

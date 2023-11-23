@@ -73,6 +73,7 @@ class RegDataset:
             input_unlabeled_tensor = torch.reshape(torch.as_tensor(self.unlabeled_data[:, :-1]), (self.unlabeled_data.shape[0], -1, in_channels))
             output, _ = model(input_repeat_labeled_tensor, input_unlabeled_tensor, input_unlabeled_tensor)
             r_idx = np.argsort(output.detach().numpy().reshape(1,-1))[:, :2][0]
+            unlabeled_data = [torch.reshape(model(input_unlabeled_tensor[i], None, None, True), (1,64)).detach() for i in r_idx]
             
             # list_similarity = []
             # list_trans_unlabeled = []
@@ -89,7 +90,7 @@ class RegDataset:
             # unlabeled_data = [torch.reshape(model(list_trans_unlabeled[i], None, None, True), (1,64)).detach() for i in r_idx]
             
             print('--------- index: {} ----- r_idx: {} -----'.format(index, r_idx))
-            unlabeled_data = [torch.reshape(model(input_unlabeled_tensor[i], None, None, True), (1,64)).detach() for i in r_idx]
+
             lab_data = torch.reshape(model(input_labeled_tensor, None, None, True), (1,64)).detach()
         else:
             r_idx = random.sample(range(0, self.unlabeled_data.shape[0]), 2)
