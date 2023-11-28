@@ -4,13 +4,15 @@ import os
 import datetime
 import pandas as pd
 import yaml
+from m5py import M5Prime
 from scipy.io import arff
 
-from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
-from TripleNet.triplet_net import train_triple_net
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, r2_score
 
 from create_pairs import generate_file
-from ctssr import CTSSR
+from TripleNet.tripleNet import train_triple_net
+from ssrm import S2RM
 
 import warnings
 
@@ -41,52 +43,63 @@ if __name__ == '__main__':
                 start_time = datetime.datetime.now()
 
                 file = file_name.split('.')[0]
-                
-                print('{} Exp:{}, Scale: {}, DataSet: {} {}'.format('*'*10, run_iter, scale, file, '*'*10))
+
+                # if file != 'pollen':
+                #     continue
+                print('****************** Exp:{}, Scale: {}, DataSet: {} ******************'.format(run_iter+3, scale,
+                                                                                                    file))
 
                 data, meta = arff.loadarff(os.path.join(config['experiment_params']['base_data_dir'], file_name))
                 data_labeled = pd.DataFrame(data)
                 in_channels = data_labeled.shape[1] - 1
-                labeled_data, unlabeled_data, test_data = split_labeled_and_unlabeled_data(data_labeled, scale, run_iter)
-                
-                
-                save_dir = './experiment/metric_ablation/{}/{}'.format(file, scale)
-                if config['regression_exp_params']['category'] == 'metric':
-                    generate_file(file, labeled_data, unlabeled_data, test_data, scale)
-                    train_triple_net(file, in_channels, scale)
-                    
-                    save_dir = './experiment/test/{}/{}'.format(file, scale)
-                
-                if not os.path.exists(save_dir):
-                    os.makedirs(save_dir)
-                    
-                model = CTSSR(
-                    scale=scale,
-                    file_name=file,
-                    run_iter=run_iter
-                )
-                model.fit(labeled_data, unlabeled_data)
-                pred = model.predict(test_data)
+                labeled_data, unlabeled_data, test_data = split_labeled_and_unlabeled_data(data_labeled, scale,
+                                                                                           rs=run_iter+3)
 
+                generate_file(labeled_data, unlabeled_data, test_data, scale)
+                train_triple_net(file, in_channels=in_channels, scale=scale)
+
+                learner1 = RandomForestRegressor(n_estimators=100, min_samples_split=2, random_state=1)
+                learner2 = RandomForestRegressor(n_estimators=120, min_samples_leaf=2, random_state=2)
+                learner3 = RandomForestRegressor(n_estimators=150, min_samples_split=3, random_state=3)
+
+                reg = S2RM(
+                    co_learners=[learner1, learner2, learner3],
+                    scale=scale,
+                    in_channels=in_channels,
+                    iteration=config['experiment_params']['iteration'],
+                    tau=config['experiment_params']['tau'],
+                    gr=config['experiment_params']['gr'],
+                    K=config['experiment_params']['K'],
+                    s_strategy=config['experiment_params']['s_strategy']
+                )
+                reg.fit(file, labeled_data)
+                methods = ['co_train']
+                pred = reg.predict(file, test_data, methods=methods)
+
+                r_mse = []
                 pd_dict = {
-                    'experiment_iter': run_iter,
+                    'experiment_iter': run_iter+3,
                     'data': file,
                 }
-                cur_rmse = mean_squared_error(test_data.iloc[:, -1], pred, squared=False)
-                cur_mae = mean_absolute_error(test_data.iloc[:, -1], pred)
-                cur_r2 = r2_score(test_data.iloc[:, -1], pred)
-                pd_dict['rmse'] = cur_rmse
-                pd_dict['mae'] = cur_mae
-                pd_dict['r2score'] = cur_r2
-                
-                print('{} DataSet: {}, RMSE: {} {}'.format('*'*10, file, cur_rmse, '*'*10))
-                print('{} DataSet: {}, MAE: {} {}'.format('*'*10, file, cur_mae, '*'*10))
-                print('{} DataSet: {}, R2: {} {}'.format('*'*10, file, cur_r2, '*'*10))
-                    
-                pd.DataFrame(pd_dict, index=[0]).to_csv('{}/{}-{}.csv'.format(save_dir,
-                                                                              run_iter,
-                                                                              datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")),
-                                                        index = False)
+                for res, me in zip(pred[3:], methods):
+                    cur_rmse = mean_squared_error(res, test_data.iloc[:, -1], squared=False)
+                    cur_r2score = r2_score(test_data.iloc[:, -1], res)
+                    r_mse.append(cur_rmse)
+                    pd_dict['{}_rmse'.format(me)] = cur_rmse
+                    pd_dict['{}_r2score'.format(me)] = cur_r2score
+                    print('****************** DataSet: {}, {} RMSE: {} R2SCORE: {} ******************'.format(file, me,
+                                                                                                  cur_rmse, cur_r2score))
+
+                if config['experiment_params']['s_strategy'] == 'metric':
+                    save_dir = './docs/experiment/{}/{}'.format(file, scale)
+                    # save_dir = './docs/{}_ablation_experiment/{}/{}'.format('stable', file, scale)
+                else:
+                    save_dir = './docs/{}_ablation_experiment/{}/{}'.format('metric', file, scale)
+
+                if not os.path.exists(save_dir):
+                    os.makedirs(save_dir)
+                pd.DataFrame(pd_dict, index=[0]).to_csv(
+                    '{}/{}-{}.csv'.format(save_dir, run_iter+3, datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")))
 
                 end_time = datetime.datetime.now()
-                print("耗时: {} 秒".format((end_time - start_time).seconds))
+                print("耗时: {}秒".format(end_time - start_time))

@@ -40,6 +40,7 @@ class TripletLoss(torch.nn.Module):
 def train_triplet(data_loader, model, optimizer, device, in_channels):
     loss_func_ranked_list = RankedListLoss()
     ranked_list_loss = 0
+    train_loss = 0
 
     for i, data in enumerate(data_loader, 0):
         anchor, positive, negative = data
@@ -52,8 +53,8 @@ def train_triplet(data_loader, model, optimizer, device, in_channels):
         ranked_list_loss = loss_func_ranked_list(output_p, output_n)
         ranked_list_loss.backward()
         optimizer.step()
-        ranked_list_loss += ranked_list_loss.item()
-    return ranked_list_loss
+        train_loss += ranked_list_loss.item()
+    return train_loss / len(data_loader)
 
 
 def validate(data_loader, model, device):

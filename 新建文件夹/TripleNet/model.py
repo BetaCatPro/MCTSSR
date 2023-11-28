@@ -11,6 +11,7 @@ class SiameseNetwork(nn.Module):
         self.fc1 = nn.Sequential(
             nn.Linear(config['in_channels'], config['number_of_neurons_1']),
             nn.LeakyReLU(inplace=True),
+            nn.Dropout(p=0.1),
             nn.Linear(config['number_of_neurons_1'], config['number_of_neurons_2'])
         )
 
@@ -72,38 +73,26 @@ class PreTripletDataset:
 
 
 class TripletDataset:
-    def __init__(self, training_labeled=None, training_unlabeled=None, model=None, number_pos_neg=5):
+    def __init__(self, training_labeled, training_unlabeled, pairs_triplet, number_pos_neg):
         self.labeled_data = pd.read_csv(training_labeled)
         self.unlabeled_data = pd.read_csv(training_unlabeled)
-        self.model = model
+        self.pairs_triplet = pd.read_csv(pairs_triplet)
         self.number_pos_neg = number_pos_neg
 
     def __getitem__(self, index):
-        device = th.device('cuda:0' if th.cuda.is_available() else 'cpu')
-        self.model.eval()
-
         labeled_data = self.labeled_data.iloc[:, 1:-1]
         unlabeled_data = self.unlabeled_data.iloc[:, 1:-1]
 
-        cur_lab = labeled_data.loc[index]
-        input_tensor_1 = th.from_numpy(np.asarray(cur_lab)).reshape(1, len(cur_lab)).to(device)
+        cur_labeled_instance = labeled_data.loc[index]
 
-        list_of_distances = []
-        for i in unlabeled_data.index.values.tolist():
-            input_tensor_2 = th.from_numpy(np.asarray(unlabeled_data.loc[i])).reshape(1, len(
-                unlabeled_data.loc[i])).to(device)
-            with th.no_grad():
-                output_1, output_2 = self.model(input_tensor_1, input_tensor_2, True)
-                difference = F.pairwise_distance(output_1, output_2).cpu().detach().numpy()[0]
-            list_of_distances.append(float(difference))
+        unlabeled_idx_list = list(self.pairs_triplet[self.pairs_triplet['Sample1'] == index]['Sample2'])
+        sort_idx = np.argsort(self.pairs_triplet[self.pairs_triplet['Sample1'] == index]['Difference'])
+        indices_pos = [unlabeled_idx_list[i] for i in sort_idx[: self.number_pos_neg]]
+        indices_neg = [unlabeled_idx_list[i] for i in sort_idx[-self.number_pos_neg:]]
 
-        sorted_res = np.argsort(list_of_distances)
-        indices_pos, indices_neg = sorted_res[0: self.number_pos_neg], sorted_res[-self.number_pos_neg:]
-
-        np.tile(cur_lab.to_numpy().astype(float), (5, 1))
-        anchor = np.tile(cur_lab.to_numpy().astype(float), (self.number_pos_neg, 1))
-        positive = unlabeled_data.iloc[indices_pos].to_numpy().astype(float)
-        negative = unlabeled_data.iloc[indices_neg].to_numpy().astype(float)
+        anchor = np.tile(cur_labeled_instance.to_numpy().astype(float), (self.number_pos_neg, 1))
+        positive = unlabeled_data.loc[indices_pos].to_numpy().astype(float)
+        negative = unlabeled_data.loc[indices_neg].to_numpy().astype(float)
 
         return anchor, positive, negative
 
