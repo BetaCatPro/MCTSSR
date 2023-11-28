@@ -56,7 +56,7 @@ if __name__ == '__main__':
                                                                                            rs=run_iter+3)
 
                 generate_file(labeled_data, unlabeled_data, test_data, scale)
-                train_triple_net(file, in_channels=in_channels, scale=scale)
+                # train_triple_net(file, in_channels=in_channels, scale=scale)
 
                 learner1 = RandomForestRegressor(n_estimators=100, min_samples_split=2, random_state=1)
                 learner2 = RandomForestRegressor(n_estimators=120, min_samples_leaf=2, random_state=2)
@@ -73,22 +73,17 @@ if __name__ == '__main__':
                     s_strategy=config['experiment_params']['s_strategy']
                 )
                 reg.fit(file, labeled_data)
-                methods = ['co_train']
-                pred = reg.predict(file, test_data, methods=methods)
+                pred = reg.predict(test_data)
 
-                r_mse = []
                 pd_dict = {
                     'experiment_iter': run_iter+3,
                     'data': file,
                 }
-                for res, me in zip(pred[3:], methods):
-                    cur_rmse = mean_squared_error(res, test_data.iloc[:, -1], squared=False)
-                    cur_r2score = r2_score(test_data.iloc[:, -1], res)
-                    r_mse.append(cur_rmse)
-                    pd_dict['{}_rmse'.format(me)] = cur_rmse
-                    pd_dict['{}_r2score'.format(me)] = cur_r2score
-                    print('****************** DataSet: {}, {} RMSE: {} R2SCORE: {} ******************'.format(file, me,
-                                                                                                  cur_rmse, cur_r2score))
+                cur_rmse = mean_squared_error(pred, test_data.iloc[:, -1], squared=False)
+                cur_r2score = r2_score(test_data.iloc[:, -1], pred)
+                pd_dict['rmse'] = cur_rmse
+                pd_dict['r2score'] = cur_r2score
+                print('****************** DataSet: {}, RMSE: {} R2SCORE: {} ******************'.format(file, cur_rmse, cur_r2score))
 
                 if config['experiment_params']['s_strategy'] == 'metric':
                     save_dir = './docs/experiment/{}/{}'.format(file, scale)

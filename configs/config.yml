@@ -4,7 +4,7 @@ dataset_params:
   dataset_path: "training_dataset"
   evaluation_path: "evaluation_dataset"
   # scale_labeled_samples: [0.005, .025, .05]
-  scale_labeled_samples: [.05]
+  scale_labeled_samples: [.025, .05, .1, .2]
 
 model_params:
   number_of_neurons_1: 16
@@ -17,6 +17,18 @@ exp_params:
   epochs: 1
   LR: 0.001
   optimizer: "adam"
+
+regression_model_params:
+  number_of_neurons_1: 256
+  number_of_neurons_2: 512
+  number_of_neurons_3: 256
+  in_channels: 32
+
+regression_exp_params:
+  batch_size: 32
+  epochs: 100
+  LR: 0.001
+  optimizer: 'adam'
 
 logging_params:
   save_dir: "saves/"

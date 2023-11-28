@@ -1,5 +1,7 @@
 import copy
 import math
+import os
+import random
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,6 +12,12 @@ from sklearn import neighbors, linear_model
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.utils import shuffle
+
+import torch as th
+
+import yaml
+from RegNet.model import RegNet
+from RegNet.reg_net import train_net
 
 from create_pairs import generate_file
 from select_samples import select_sim_samples
@@ -44,6 +52,8 @@ class S2RM:
         self.labeled_v_data = []
         # 从 pool 中选择的数据
         self.pi = []
+        
+        self.file_name = ''
 
     def _init_training_data_and_reg(self, data_name, labeled_data):
         """
@@ -52,63 +62,6 @@ class S2RM:
         :return: None
         """
         self.labeled_data = labeled_data.reset_index(drop=True)
-
-        #### test start
-        # origin_data = self.labeled_data
-        # transform_data = transform(data_name, origin_data, in_channels=self.in_channels)
-        # plt.axis('off')
-        # plt.scatter(origin_data.iloc[:, 0], origin_data.iloc[:, 1])
-        # plt.savefig('origin_L.svg', dpi=300)
-        # plt.show()
-        # plt.clf()
-        #
-        # plt.axis('off')
-        # plt.scatter(transform_data[:, 0], transform_data[:, 1])
-        # plt.savefig('transform_L.svg', dpi=300)
-        # plt.show()
-        # plt.clf()
-
-        # poly_reg = PolynomialFeatures(degree=2)
-        # x_poly = poly_reg.fit_transform(transform_data[:, 0].reshape(-1, 1))
-        #
-        # learner = linear_model.LinearRegression()
-        # learner.fit(x_poly, transform_data[:, 1].reshape(-1, 1))
-        # pred = learner.predict(x_poly)
-        #
-        # plt.axis('off')
-        # plt.scatter(transform_data[:, 0], transform_data[:, 1])
-        # plt.plot(transform_data[:, 0], pred, c='r')
-        # plt.savefig('regressor1.svg', dpi=300)
-        # plt.show()
-        #
-        # plt.axis('off')
-        # plt.scatter(transform_data[10:-100, 0], transform_data[10:-100, 1])
-        # plt.plot(transform_data[10:-100, 0], pred[10:-100], c='g')
-        # plt.savefig('regressor2.svg', dpi=300)
-        # plt.show()
-        #
-        # plt.axis('off')
-        # plt.scatter(transform_data[100:-10, 0], transform_data[100:-10, 1])
-        # plt.plot(transform_data[100:-10, 0], pred[100:-10], c='y')
-        # plt.savefig('regressor3.svg', dpi=300)
-        # plt.show()
-
-        """
-        origin_data = self.labeled_data
-        transform_data = transform(data_name, origin_data, in_channels=self.in_channels)
-        plt.axis('off')
-        plt.scatter(origin_data.iloc[:, 0], origin_data.iloc[:, 1], c='g')
-        plt.savefig('origin_U.svg', dpi=300)
-        plt.show()
-        plt.clf()
-
-        plt.axis('off')
-        plt.scatter(transform_data[:, 0], transform_data[:, 1], c='g')
-        plt.savefig('transform_U.svg', dpi=300)
-        plt.show()
-        plt.clf()
-        #### test stop
-        """
 
         for n in range(len(self.co_learners)):
             inner_data = self.labeled_data.sample(math.ceil(self.labeled_data.shape[0] * .8))
@@ -131,7 +84,7 @@ class S2RM:
         origin_labeled_data_size = self.labeled_data.shape[0]
 
         while not selected.empty:
-            self._inner_test(data_name, selected)
+            self._inner_test(selected)
             for i in range(len(self.co_learners)):
                 pool = shuffle(selected).reset_index(drop=True)
                 _pi, _index = self._select_relevant_examples(i, pool, self.labeled_v_data[i], self.gr, data_name)
@@ -217,6 +170,7 @@ class S2RM:
         return pred_unlabeled_data[x_u_index[0:i_counts]], [stable_samples_idx[i] for i in x_u_index[0:1]]
 
     def fit(self, data_name, labeled_data):
+        self.file_name = data_name
         self._init_training_data_and_reg(data_name, labeled_data)
 
         selected, unlabeled_data, is_select_all = select_sim_samples(data_name=data_name,
@@ -256,52 +210,61 @@ class S2RM:
                 data_size=labeled_data_size,
                 s_strategy=self.s_strategy
             )
+        
+        # TODO 训练RegNN
+        
+        # 合并去重
+        st_labeled_data = np.unique(np.vstack(self.labeled_l_data), axis=0)
+        r_idx = random.sample(range(0, st_labeled_data.shape[0]), int(st_labeled_data.shape[0]*.8))
+        
+        training_view = st_labeled_data[r_idx]
+        validation_view = np.delete(st_labeled_data, r_idx, axis=0)
+        unlabeled_view = transform(self.file_name, unlabeled_data, self.in_channels)
+        
+        print('--------- start training regnet -----------')
+        train_net(training_view, validation_view, unlabeled_view)
 
-    def predict(self, data_name, data, methods=None):
-        """
-        methods: ['co_train', 'm5p'] ===>
-        co_train : 采用协同预测
-        m5p : 利用带伪标签数据训练的 m5p 模型
-        :param data_name: 数据文件名
-        :param methods: 数据预测的预测方法
-        :param data: 待预测样本
-        :return: result: 预测结果
-        """
+
+    def predict(self, data):
+        with open('configs/config.yml', 'r') as file:
+            try:
+                config = yaml.safe_load(file)
+            except yaml.YAMLError as exc:
+                print(exc)
+
+        device = 'cuda' if th.cuda.is_available() else 'cpu'
+        
+        t_data = transform(self.file_name, data, self.in_channels)
+
+        load_path = os.path.join('saves', 'reg_model.pth')
+        model = RegNet(**config['regression_model_params']).to(device)
+        model.load_state_dict(th.load(load_path, map_location=lambda storage, loc: storage.cuda(0)))
+        model.eval()
+    
+        nn_data = th.as_tensor(t_data[:, :-1]).to(th.float32).to(device)
+        pred = model(nn_data).cpu().detach().numpy()
+        return pred
+    
+    def _predict(self, data):
         self.labeled_data = self.labeled_data.reset_index(drop=True)
-        train_data_x = self.labeled_data.iloc[:, :-1]
-        train_data_y = self.labeled_data.iloc[:, -1]
 
-        unlabeled_data = data
-        trans_unlabeled_data = transform(data_name, data, in_channels=self.in_channels)
+        trans_unlabeled_data = transform(self.file_name, data, in_channels=self.in_channels)
         trans_unlabeled_data_x = trans_unlabeled_data[:, :-1]
-        unlabeled_data_x = unlabeled_data.iloc[:, :-1]
-
-        trans_labeled_data = transform(data_name, self.labeled_data, in_channels=self.in_channels)
-        trans_labeled_data_x = trans_labeled_data[:, :-1]
-        trans_labeled_data_y = trans_labeled_data[:, -1]
 
         result = []
-        if methods is None:
-            methods = ['co_train']
-        if 'co_train' in methods:
-            pred = []
-            weight = [1 / len(self.co_learners)] * len(self.co_learners)
-            for learner, w in zip(self.co_learners, weight):
-                pred.append(w * learner.predict(trans_unlabeled_data_x))
-                result.append(learner.predict(trans_unlabeled_data_x))
-            result.append(sum(pred))
-        if 'm5p' in methods:
-            m5 = M5Prime(min_samples_leaf=4)
-            m5.fit(trans_labeled_data_x, trans_labeled_data_y)
-            result.append(m5.predict(trans_unlabeled_data_x))
-
+        pred = []
+        weight = [1 / len(self.co_learners)] * len(self.co_learners)
+        for learner, w in zip(self.co_learners, weight):
+            pred.append(w * learner.predict(trans_unlabeled_data_x))
+            result.append(learner.predict(trans_unlabeled_data_x))
+        result.append(sum(pred))
         return result
 
-    def _inner_test(self, data_name, selected):
+    def _inner_test(self, selected):
         val_data = pd.read_csv('evaluation_dataset/{}/evaluation.csv'.format(self.scale)).drop(['index'], axis=1)
         val_data_y = val_data.iloc[:, -1]
 
-        result = self.predict(data_name, val_data, methods=['co_train'])
+        result = self._predict(val_data)
 
         print('------- cur pool size: {}-------'.format(selected.shape[0]))
         print('RF1 : {}'.format(mean_squared_error(result[0], val_data_y, squared=False)))
@@ -309,4 +272,3 @@ class S2RM:
         print('RF3 : {}'.format(mean_squared_error(result[2], val_data_y, squared=False)))
         print('co-training rmse: {}'.format(mean_squared_error(result[3], val_data_y, squared=False)))
         print('co-training r2score: {}'.format(r2_score(val_data_y, result[3])))
-        # print('m5p : {}'.format(mean_squared_error(result[4], val_data_y, squared=False)))
