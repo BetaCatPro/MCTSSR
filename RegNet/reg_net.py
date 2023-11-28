@@ -39,6 +39,7 @@ def train_net(training_view, validation_view, unlabeled_view):
     with open('configs/config.yml', 'r') as file:
         try:
             config = yaml.safe_load(file)
+            config['regression_model_params']['in_channels'] = training_view.shape[1] - 1
         except yaml.YAMLError as exc:
             print(exc)
 

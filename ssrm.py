@@ -66,8 +66,13 @@ class S2RM:
         for n in range(len(self.co_learners)):
             inner_data = self.labeled_data.sample(math.ceil(self.labeled_data.shape[0] * .8))
             outer_data = self.labeled_data.drop(inner_data.index)
-            inner_data = transform(data_name, inner_data, in_channels=self.in_channels)
-            outer_data = transform(data_name, outer_data, in_channels=self.in_channels)
+            
+            if self.s_strategy == 'metric':
+                inner_data = transform(data_name, inner_data, in_channels=self.in_channels)
+                outer_data = transform(data_name, outer_data, in_channels=self.in_channels)
+            else:
+                inner_data = inner_data.to_numpy()
+                outer_data = outer_data.to_numpy()
             self.labeled_l_data.append(inner_data)
             self.labeled_v_data.append(outer_data)
 
@@ -117,7 +122,11 @@ class S2RM:
         :param gr: grow rate
         :return: pi: 被选择置信数据
         """
-        transform_unlabeled_data = transform(data_name, unlabeled_data, in_channels=self.in_channels)
+        
+        if self.s_strategy == 'metric':
+            transform_unlabeled_data = transform(data_name, unlabeled_data, in_channels=self.in_channels)
+        else:
+            transform_unlabeled_data = unlabeled_data.to_numpy()
 
         delta_x_u_result = []
 
@@ -219,7 +228,11 @@ class S2RM:
         
         training_view = st_labeled_data[r_idx]
         validation_view = np.delete(st_labeled_data, r_idx, axis=0)
-        unlabeled_view = transform(self.file_name, unlabeled_data, self.in_channels)
+        
+        if self.s_strategy == 'metric':
+            unlabeled_view = transform(self.file_name, unlabeled_data, self.in_channels)
+        else:
+            unlabeled_view = unlabeled_data.to_numpy()
         
         print('--------- start training regnet -----------')
         train_net(training_view, validation_view, unlabeled_view)
@@ -234,7 +247,11 @@ class S2RM:
 
         device = 'cuda' if th.cuda.is_available() else 'cpu'
         
-        t_data = transform(self.file_name, data, self.in_channels)
+        if self.s_strategy == 'metric':
+            t_data = transform(self.file_name, data, self.in_channels)
+        else:
+            config['regression_model_params']['in_channels'] = t_data.shape[1] - 1
+            t_data = data.to_numpy()
 
         load_path = os.path.join('saves', 'reg_model.pth')
         model = RegNet(**config['regression_model_params']).to(device)
@@ -248,7 +265,10 @@ class S2RM:
     def _predict(self, data):
         self.labeled_data = self.labeled_data.reset_index(drop=True)
 
-        trans_unlabeled_data = transform(self.file_name, data, in_channels=self.in_channels)
+        if self.s_strategy == 'metric':
+            trans_unlabeled_data = transform(self.file_name, data, in_channels=self.in_channels)
+        else:
+            trans_unlabeled_data = data.to_numpy()
         trans_unlabeled_data_x = trans_unlabeled_data[:, :-1]
 
         result = []

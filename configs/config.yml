@@ -3,8 +3,8 @@ dataset_params:
   evaluation_path_fixed: "evaluation_dataset"
   dataset_path: "training_dataset"
   evaluation_path: "evaluation_dataset"
-  # scale_labeled_samples: [0.005, .025, .05]
-  scale_labeled_samples: [.025, .05, .1, .2]
+  scale_labeled_samples: [0.005, .025, .05]
+  # scale_labeled_samples: [.025, .05, .1, .2]
 
 model_params:
   number_of_neurons_1: 16
@@ -41,4 +41,5 @@ experiment_params:
   tau: 3
   gr: 1
   K: 3
-  s_strategy: 'metric'
+  # s_strategy: 'metric'
+  s_strategy: 'normal'
