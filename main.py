@@ -4,7 +4,6 @@ import os
 import datetime
 import pandas as pd
 import yaml
-from m5py import M5Prime
 from scipy.io import arff
 
 from sklearn.ensemble import RandomForestRegressor
@@ -44,8 +43,6 @@ if __name__ == '__main__':
 
                 file = file_name.split('.')[0]
 
-                # if file != 'pollen':
-                #     continue
                 print('****************** Exp:{}, Scale: {}, DataSet: {} ******************'.format(run_iter+3, scale,
                                                                                                     file))
 
@@ -56,7 +53,17 @@ if __name__ == '__main__':
                                                                                            rs=run_iter+3)
 
                 generate_file(labeled_data, unlabeled_data, test_data, scale)
-                # train_triple_net(file, in_channels=in_channels, scale=scale)
+                
+                if config['experiment_params']['s_strategy'] == 'metric':
+                    train_triple_net(file, in_channels=in_channels, scale=scale)
+                    
+                    save_dir = './docs/experiment/{}/{}'.format(file, scale)
+                    # save_dir = './docs/{}_ablation_experiment/{}/{}'.format('stable', file, scale)
+                else:
+                    save_dir = './docs/{}_ablation_experiment/{}/{}'.format('metric', file, scale)
+
+                if not os.path.exists(save_dir):
+                    os.makedirs(save_dir)
 
                 learner1 = RandomForestRegressor(n_estimators=100, min_samples_split=2, random_state=1)
                 learner2 = RandomForestRegressor(n_estimators=120, min_samples_leaf=2, random_state=2)
@@ -85,14 +92,6 @@ if __name__ == '__main__':
                 pd_dict['r2score'] = cur_r2score
                 print('****************** DataSet: {}, RMSE: {} R2SCORE: {} ******************'.format(file, cur_rmse, cur_r2score))
 
-                if config['experiment_params']['s_strategy'] == 'metric':
-                    save_dir = './docs/experiment/{}/{}'.format(file, scale)
-                    # save_dir = './docs/{}_ablation_experiment/{}/{}'.format('stable', file, scale)
-                else:
-                    save_dir = './docs/{}_ablation_experiment/{}/{}'.format('metric', file, scale)
-
-                if not os.path.exists(save_dir):
-                    os.makedirs(save_dir)
                 pd.DataFrame(pd_dict, index=[0]).to_csv(
                     '{}/{}-{}.csv'.format(save_dir, run_iter+3, datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")))
 

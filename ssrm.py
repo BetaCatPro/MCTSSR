@@ -234,7 +234,6 @@ class S2RM:
         else:
             unlabeled_view = unlabeled_data.to_numpy()
         
-        print('--------- start training regnet -----------')
         train_net(training_view, validation_view, unlabeled_view)
 
 
@@ -250,7 +249,7 @@ class S2RM:
         if self.s_strategy == 'metric':
             t_data = transform(self.file_name, data, self.in_channels)
         else:
-            config['regression_model_params']['in_channels'] = t_data.shape[1] - 1
+            config['regression_model_params']['in_channels'] = data.shape[1] - 1
             t_data = data.to_numpy()
 
         load_path = os.path.join('saves', 'reg_model.pth')

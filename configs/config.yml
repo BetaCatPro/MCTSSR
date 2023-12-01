@@ -3,8 +3,8 @@ dataset_params:
   evaluation_path_fixed: "evaluation_dataset"
   dataset_path: "training_dataset"
   evaluation_path: "evaluation_dataset"
-  scale_labeled_samples: [0.005, .025, .05]
-  # scale_labeled_samples: [.025, .05, .1, .2]
+  # scale_labeled_samples: [0.005, .025, .05, .1]
+  scale_labeled_samples: [.05]
 
 model_params:
   number_of_neurons_1: 16
@@ -19,8 +19,8 @@ exp_params:
   optimizer: "adam"
 
 regression_model_params:
-  number_of_neurons_1: 256
-  number_of_neurons_2: 512
+  number_of_neurons_1: 512
+  number_of_neurons_2: 1024
   number_of_neurons_3: 256
   in_channels: 32
 

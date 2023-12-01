@@ -53,8 +53,8 @@ def train_reg_net(epoch, data_loader, view_model, optimizer, device):
         inner_consistency_loss = smooth_l1_loss(mix_target, mix_data_target)
         # total loss
         alpha_weight = 1.0 * sigmoid_ramp_up(epoch + 1)
-        loss = model_supervised_loss + alpha_weight * inner_consistency_loss
-        # loss = model_supervised_loss
+        # loss = model_supervised_loss + alpha_weight * inner_consistency_loss
+        loss = model_supervised_loss
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
