@@ -64,10 +64,10 @@ def train_net(training_view, validation_view, unlabeled_view):
 
         view_model[0].eval()
         stu_validation_rmse, stu_r2 = validate(validation_view, view_model[0], device)
-        # tea_validation_rmse, tea_r2 = validate(validation_view, view_model[1], device)
+        tea_validation_rmse, tea_r2 = validate(validation_view, view_model[1], device)
 
         print('{} stu Epoch: {} train loss: {}, val rmse: {}, r2: {} {}'.format('*'*10, epoch + 1, loss, stu_validation_rmse, stu_r2, '*'*10))
-        # print('{} tea Epoch: {} train loss: {}, val rmse: {} {}'.format('*'*10, epoch + 1, loss, tea_validation_rmse, '*'*10))
+        print('{} tea Epoch: {} train loss: {}, val rmse: {} {}'.format('*'*10, epoch + 1, loss, tea_validation_rmse, '*'*10))
 
         if stu_validation_rmse < cur_min_val_error:
             torch.save(view_model[0].state_dict(), os.path.join('saves', 'reg_model.pth'))
